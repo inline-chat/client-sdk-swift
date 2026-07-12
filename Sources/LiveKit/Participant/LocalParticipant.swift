@@ -649,6 +649,10 @@ extension LocalParticipant {
             transInit.sendEncodings = sendEncodings
 
             let addTrackName = publishName ?? track.name
+            // Preserve a local track's pre-publication mute state in the
+            // initial server metadata. This lets callers safely publish a
+            // disabled microphone without briefly advertising it as live.
+            let initiallyMuted = track.isMuted
             // Request a new track to the server
             let addTrackFunc: @Sendable () async throws -> Livekit_TrackInfo = {
                 try await room.signalClient.sendAddTrack(cid: track.mediaTrack.trackId,
@@ -656,7 +660,10 @@ extension LocalParticipant {
                                                          type: track.kind.toPBType(),
                                                          source: track.source.toPBType(),
                                                          encryption: room.e2eeManager?.frameEncryptionType.toPBType() ?? .none,
-                                                         populatorFunc)
+                                                         { request in
+                                                             request.muted = initiallyMuted
+                                                             try populatorFunc(&request)
+                                                         })
             }
 
             let negotiateFunc: @Sendable () async throws -> Void = {
@@ -705,7 +712,9 @@ extension LocalParticipant {
             // At this point at least 1 audio frame should be generated to continue
             if let track = track as? LocalAudioTrack {
                 // Only wait for frames if audio engine is allowed to start
-                if AudioManager.shared.engineAvailability.isInputAvailable {
+                // A muted local track is disabled and intentionally produces
+                // no frames. Waiting for one here can only time out.
+                if !initiallyMuted, AudioManager.shared.engineAvailability.isInputAvailable {
                     log("[Publish] Waiting for audio frame...")
                     try await track.startWaitingForFrames()
                 }
