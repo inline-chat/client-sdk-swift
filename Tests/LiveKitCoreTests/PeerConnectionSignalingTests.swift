@@ -123,6 +123,7 @@ private final class ReconnectWatcher: NSObject, RoomDelegate, @unchecked Sendabl
 // MARK: - PeerConnectionSignalingTests
 
 @Suite(.serialized, .tags(.e2e))
+// swiftlint:disable:next type_body_length
 struct PeerConnectionSignalingTests {
     // MARK: - Helpers
 
@@ -324,6 +325,33 @@ struct PeerConnectionSignalingTests {
 
             #expect(room.connectionState == .connected, "Room should be connected after full reconnect")
             #expect(room.localParticipant.trackPublications.count == tracksBefore, "Tracks should be restored")
+        }
+    }
+
+    @Test(arguments: SignalingMode.allCases)
+    func fullReconnectRepublishesMutedAudioWithoutRetiredPublication(mode: SignalingMode) async throws {
+        let reconnectWatcher = ReconnectWatcher()
+
+        try await TestEnvironment.withRooms([
+            roomTestingOptions(mode: mode, delegate: reconnectWatcher, canPublish: true),
+        ]) { rooms in
+            let room = rooms[0]
+            let audioTrack = TestAudioTrack()
+            try await audioTrack.mute()
+            let retiredPublication = try await room.localParticipant.publish(audioTrack: audioTrack)
+            let retiredSID = retiredPublication.sid
+
+            #expect(retiredPublication.isMuted)
+            reconnectWatcher.prepareForReconnect(expectedTrackCount: 1)
+            try await room.debug_simulate(scenario: .fullReconnect)
+            try await reconnectWatcher.waitForReconnect(withTracks: true)
+
+            let replacement = try #require(room.localParticipant.firstAudioPublication as? LocalTrackPublication)
+            #expect(replacement.sid != retiredSID)
+            #expect(replacement.track === audioTrack)
+            #expect(replacement.isMuted)
+            #expect(retiredPublication.track == nil)
+            #expect(room.localParticipant.localAudioTracks.count == 1)
         }
     }
 

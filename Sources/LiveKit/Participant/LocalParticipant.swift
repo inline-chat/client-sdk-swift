@@ -302,14 +302,32 @@ extension LocalParticipant {
     }
 
     func republishAllTracks() async throws {
-        let mediaTracks = _state.trackPublications.values.map { $0.track as? LocalTrack }.compactMap(\.self)
+        _ = try await _publishSerialRunner.run {
+            let publications = self._state.trackPublications.values.compactMap { $0 as? LocalTrackPublication }
+            let mediaTracks = publications.compactMap { $0.track as? LocalTrack }
 
-        await unpublishAll()
+            // Reconnect republish must be one publication transaction. Without
+            // this shared serial runner, an app-level recovery publish can race
+            // the SDK's detached republish task and negotiate the same track
+            // twice.
+            for publication in publications {
+                do {
+                    try await self.unpublish(publication: publication)
+                } catch {
+                    self.log("Failed to unpublish track \(publication.sid) before republish: \(error)", .error)
+                }
 
-        for mediaTrack in mediaTracks {
-            // Don't re-publish muted tracks
-            if mediaTrack.isMuted { continue }
-            try await _publish(track: mediaTrack, options: mediaTrack.publishOptions)
+                // Retired publications must stop observing the retained track.
+                // Otherwise later mute changes keep signaling the old SID after
+                // the replacement publication has been installed.
+                await publication.set(track: nil)
+            }
+
+            var lastPublication: LocalTrackPublication?
+            for mediaTrack in mediaTracks {
+                lastPublication = try await self._publish(track: mediaTrack, options: mediaTrack.publishOptions)
+            }
+            return lastPublication
         }
     }
 }
@@ -659,11 +677,11 @@ extension LocalParticipant {
                                                          name: addTrackName,
                                                          type: track.kind.toPBType(),
                                                          source: track.source.toPBType(),
-                                                         encryption: room.e2eeManager?.frameEncryptionType.toPBType() ?? .none,
-                                                         { request in
-                                                             request.muted = initiallyMuted
-                                                             try populatorFunc(&request)
-                                                         })
+                                                         encryption: room.e2eeManager?.frameEncryptionType.toPBType() ?? .none)
+                { request in
+                    request.muted = initiallyMuted
+                    try populatorFunc(&request)
+                }
             }
 
             let negotiateFunc: @Sendable () async throws -> Void = {
@@ -736,6 +754,21 @@ extension LocalParticipant {
             await publication.set(track: track)
 
             add(publication: publication)
+
+            // Mute intent may change while AddTrack or negotiation is in
+            // flight. The publication delegate only observes changes after it
+            // is attached above, so explicitly reconcile any earlier change
+            // against the new SID.
+            if track.isMuted != initiallyMuted {
+                do {
+                    try await room.signalClient.sendMuteTrack(
+                        trackSid: publication.sid,
+                        muted: track.isMuted,
+                    )
+                } catch {
+                    log("[publish] failed to reconcile final mute state for \(publication.sid): \(error)", .error)
+                }
+            }
 
             // Notify didPublish
             delegates.notify(label: { "localParticipant.didPublish \(publication)" }) {
