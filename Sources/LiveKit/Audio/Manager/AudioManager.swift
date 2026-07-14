@@ -495,6 +495,19 @@ public class AudioManager: Loggable {
         RTC.audioDeviceModule.isEngineRunning
     }
 
+    /// Whether the underlying audio device module is actively recording.
+    /// A running playout-only engine is not microphone readiness.
+    public var isRecording: Bool {
+        RTC.audioDeviceModule.isRecording
+    }
+
+    /// Whether the underlying audio device module is actively playing audio.
+    /// This is a read-only provider fact; the application retains route and
+    /// recovery policy.
+    public var isPlaying: Bool {
+        RTC.audioDeviceModule.isPlaying
+    }
+
     /// Acquires an audio session requirement for external ownership.
     ///
     /// On platforms without `AVAudioSession`, this returns a no-op handle.

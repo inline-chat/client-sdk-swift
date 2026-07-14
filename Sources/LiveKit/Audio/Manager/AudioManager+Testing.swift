@@ -27,21 +27,8 @@ extension AudioManager {
         RTC.audioDeviceModule.isPlayoutInitialized
     }
 
-    /// Whether the underlying audio device module is actively playing audio.
-    /// This is a read-only provider fact; the application retains route and
-    /// recovery policy.
-    public var isPlaying: Bool {
-        RTC.audioDeviceModule.isPlaying
-    }
-
     var isRecordingInitialized: Bool {
         RTC.audioDeviceModule.isRecordingInitialized
-    }
-
-    /// Whether the underlying audio device module is actively recording.
-    /// A running playout-only engine is not microphone readiness.
-    public var isRecording: Bool {
-        RTC.audioDeviceModule.isRecording
     }
 
     @discardableResult
