@@ -33,6 +33,14 @@ actor RTC {
 
     static let pcFactoryState = StateSync(PeerConnectionFactoryState())
 
+    #if os(macOS)
+    /// WebRTC's platform-default macOS ADM is initialized by the voice engine
+    /// when its first peer connection is created. Keep one closed connection
+    /// alive so applications can enumerate and select HAL devices before they
+    /// establish a room connection.
+    private static let platformAudioDevicePrimer = StateSync<LKRTCPeerConnection?>(nil)
+    #endif
+
     // global properties are already lazy
 
     static let encoderFactory: LKRTCVideoEncoderFactory & Sendable = {
@@ -73,6 +81,34 @@ actor RTC {
 
     static var audioDeviceModule: LKRTCAudioDeviceModule {
         peerConnectionFactory.audioDeviceModule
+    }
+
+    static func preparePlatformAudioDeviceModule() throws {
+        #if os(macOS)
+        guard pcFactoryState.admType == .platformDefault else { return }
+        guard platformAudioDevicePrimer.copy() == nil else { return }
+
+        let configuration = LKRTCConfiguration()
+        let constraints = LKRTCMediaConstraints(mandatoryConstraints: nil,
+                                                optionalConstraints: nil)
+        guard let primer = createPeerConnection(configuration, constraints: constraints) else {
+            throw LiveKitError(.webRTC, message: "Failed to initialize the platform audio device module")
+        }
+
+        DispatchQueue.liveKitWebRTC.sync {
+            primer.close()
+        }
+        let retained = platformAudioDevicePrimer.mutate { current -> Bool in
+            guard current == nil else { return false }
+            current = primer
+            return true
+        }
+        if !retained {
+            // Another caller won the race. Its retained connection keeps the
+            // factory-scoped ADM initialized; this duplicate can be released.
+            return
+        }
+        #endif
     }
 
     static func createPeerConnection(_ configuration: LKRTCConfiguration,

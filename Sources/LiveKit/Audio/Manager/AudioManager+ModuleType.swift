@@ -48,4 +48,17 @@ public extension AudioManager {
         }
         RTC.pcFactoryState.mutate { $0.admType = audioDeviceModuleType }
     }
+
+    /// Prepares WebRTC's platform audio device module for device discovery and
+    /// selection before the first room connection is established.
+    ///
+    /// WebRTC initializes the platform-default macOS audio device module from
+    /// its peer-connection lifecycle. Call this after selecting
+    /// ``AudioDeviceModuleType/platformDefault`` when the application needs to
+    /// own microphone routing before it creates a room. The AudioEngine module
+    /// and non-macOS platforms require no additional preparation.
+    static func preparePlatformAudioDeviceModule() throws {
+        prepare()
+        try RTC.preparePlatformAudioDeviceModule()
+    }
 }

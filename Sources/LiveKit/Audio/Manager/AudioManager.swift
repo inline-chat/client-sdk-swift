@@ -269,7 +269,7 @@ public class AudioManager: Loggable {
     @discardableResult
     public func trySetOutputDevice(_ device: AudioDevice) -> Bool {
         #if os(macOS)
-        RTC.audioDeviceModule.trySetOutputDevice(device._ioDevice)
+        setAndVerifyOutputDevice(device)
         #else
         false
         #endif
@@ -300,7 +300,7 @@ public class AudioManager: Loggable {
     @discardableResult
     public func trySetInputDevice(_ device: AudioDevice) -> Bool {
         #if os(macOS)
-        RTC.audioDeviceModule.trySetInputDevice(device._ioDevice)
+        setAndVerifyInputDevice(device)
         #else
         false
         #endif
@@ -316,7 +316,7 @@ public class AudioManager: Loggable {
     @discardableResult
     public func tryClearInputDevice() -> Bool {
         #if os(macOS)
-        RTC.audioDeviceModule.trySetInputDevice(nil)
+        clearAndVerifyInputDevice()
         #else
         false
         #endif
@@ -559,6 +559,27 @@ public class AudioManager: Loggable {
         RTC.audioDeviceModule.observer = _admDelegateAdapter
     }
 }
+
+#if os(macOS)
+private extension AudioManager {
+    /// The current WebRTC Obj-C bridge converts its zero-on-success native
+    /// result directly to BOOL. Readback is the authoritative contract.
+    func setAndVerifyOutputDevice(_ device: AudioDevice) -> Bool {
+        _ = RTC.audioDeviceModule.trySetOutputDevice(device._ioDevice)
+        return RTC.audioDeviceModule.outputDevice.deviceId == device.deviceId
+    }
+
+    func setAndVerifyInputDevice(_ device: AudioDevice) -> Bool {
+        _ = RTC.audioDeviceModule.trySetInputDevice(device._ioDevice)
+        return RTC.audioDeviceModule.inputDevice.deviceId == device.deviceId
+    }
+
+    func clearAndVerifyInputDevice() -> Bool {
+        _ = RTC.audioDeviceModule.trySetInputDevice(nil)
+        return RTC.audioDeviceModule.inputDevice.deviceId == defaultInputDevice.deviceId
+    }
+}
+#endif
 
 public extension AudioManager {
     /// Add an ``AudioRenderer`` to receive pcm buffers from local input (mic).

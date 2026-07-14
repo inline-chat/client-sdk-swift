@@ -27,6 +27,17 @@ import LiveKitWebRTC
     @Test func startLocalRecordingLegacyADM() async throws {
         // Use legacy ADM
         try AudioManager.set(audioDeviceModuleType: .platformDefault)
+        try AudioManager.preparePlatformAudioDeviceModule()
+
+        let manager = AudioManager.shared
+        #expect(!manager.inputDevices.isEmpty)
+        #expect(!manager.outputDevices.isEmpty)
+        if let explicitInput = manager.inputDevices.first(where: { !$0.isDefault }) {
+            #expect(manager.trySetInputDevice(explicitInput))
+            #expect(manager.inputDevice.deviceId == explicitInput.deviceId)
+            #expect(manager.tryClearInputDevice())
+            #expect(manager.inputDevice.deviceId == manager.defaultInputDevice.deviceId)
+        }
 
         // Ensure audio session category is `.playAndRecord`.
         #if os(iOS) || os(tvOS) || os(visionOS)
