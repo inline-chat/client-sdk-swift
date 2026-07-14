@@ -269,7 +269,7 @@ public class AudioManager: Loggable {
     @discardableResult
     public func trySetOutputDevice(_ device: AudioDevice) -> Bool {
         #if os(macOS)
-        setAndVerifyOutputDevice(device)
+        setOutputDeviceCorrectingBridgeResult(device)
         #else
         false
         #endif
@@ -300,7 +300,7 @@ public class AudioManager: Loggable {
     @discardableResult
     public func trySetInputDevice(_ device: AudioDevice) -> Bool {
         #if os(macOS)
-        setAndVerifyInputDevice(device)
+        setInputDeviceCorrectingBridgeResult(device)
         #else
         false
         #endif
@@ -316,7 +316,7 @@ public class AudioManager: Loggable {
     @discardableResult
     public func tryClearInputDevice() -> Bool {
         #if os(macOS)
-        clearAndVerifyInputDevice()
+        clearInputDeviceCorrectingBridgeResult()
         #else
         false
         #endif
@@ -563,20 +563,18 @@ public class AudioManager: Loggable {
 #if os(macOS)
 private extension AudioManager {
     /// The current WebRTC Obj-C bridge converts its zero-on-success native
-    /// result directly to BOOL. Readback is the authoritative contract.
-    func setAndVerifyOutputDevice(_ device: AudioDevice) -> Bool {
-        _ = RTC.audioDeviceModule.trySetOutputDevice(device._ioDevice)
-        return RTC.audioDeviceModule.outputDevice.deviceId == device.deviceId
+    /// result directly to BOOL. Correct that representation without imposing
+    /// route-settling policy on the SDK.
+    func setOutputDeviceCorrectingBridgeResult(_ device: AudioDevice) -> Bool {
+        !RTC.audioDeviceModule.trySetOutputDevice(device._ioDevice)
     }
 
-    func setAndVerifyInputDevice(_ device: AudioDevice) -> Bool {
-        _ = RTC.audioDeviceModule.trySetInputDevice(device._ioDevice)
-        return RTC.audioDeviceModule.inputDevice.deviceId == device.deviceId
+    func setInputDeviceCorrectingBridgeResult(_ device: AudioDevice) -> Bool {
+        !RTC.audioDeviceModule.trySetInputDevice(device._ioDevice)
     }
 
-    func clearAndVerifyInputDevice() -> Bool {
-        _ = RTC.audioDeviceModule.trySetInputDevice(nil)
-        return RTC.audioDeviceModule.inputDevice.deviceId == defaultInputDevice.deviceId
+    func clearInputDeviceCorrectingBridgeResult() -> Bool {
+        !RTC.audioDeviceModule.trySetInputDevice(nil)
     }
 }
 #endif
