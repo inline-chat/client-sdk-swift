@@ -306,6 +306,22 @@ public class AudioManager: Loggable {
         #endif
     }
 
+    /// Clears an explicit input-device override and returns to following the system default.
+    ///
+    /// The default ``AudioDevice`` is a presentation value, not a physical device. Consumers
+    /// that own route policy should use this operation instead of attempting to select that
+    /// synthetic device through ``trySetInputDevice(_:)``.
+    ///
+    /// - Returns: `true` when the audio device module accepted the route change; otherwise, `false`.
+    @discardableResult
+    public func tryClearInputDevice() -> Bool {
+        #if os(macOS)
+        RTC.audioDeviceModule.trySetInputDevice(nil)
+        #else
+        false
+        #endif
+    }
+
     public var onDeviceUpdate: OnDevicesDidUpdate? {
         get { _state.onDevicesDidUpdate }
         set { _state.mutate { $0.onDevicesDidUpdate = newValue } }
