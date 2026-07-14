@@ -259,6 +259,22 @@ public class AudioManager: Loggable {
         }
     }
 
+    /// Attempts to select an audio output device and reports whether the audio device module accepted it.
+    ///
+    /// Use this when the application owns route fallback or retry policy and must distinguish a successful
+    /// selection from the compatibility ``outputDevice`` setter, which cannot report failure.
+    ///
+    /// - Parameter device: The output device to select.
+    /// - Returns: `true` when the audio device module accepted the selection; otherwise, `false`.
+    @discardableResult
+    public func trySetOutputDevice(_ device: AudioDevice) -> Bool {
+        #if os(macOS)
+        RTC.audioDeviceModule.trySetOutputDevice(device._ioDevice)
+        #else
+        false
+        #endif
+    }
+
     public var inputDevice: AudioDevice {
         get {
             #if os(macOS)
@@ -272,6 +288,22 @@ public class AudioManager: Loggable {
             RTC.audioDeviceModule.inputDevice = newValue._ioDevice
             #endif
         }
+    }
+
+    /// Attempts to select an audio input device and reports whether the audio device module accepted it.
+    ///
+    /// Use this when the application owns route fallback or retry policy and must distinguish a successful
+    /// selection from the compatibility ``inputDevice`` setter, which cannot report failure.
+    ///
+    /// - Parameter device: The input device to select.
+    /// - Returns: `true` when the audio device module accepted the selection; otherwise, `false`.
+    @discardableResult
+    public func trySetInputDevice(_ device: AudioDevice) -> Bool {
+        #if os(macOS)
+        RTC.audioDeviceModule.trySetInputDevice(device._ioDevice)
+        #else
+        false
+        #endif
     }
 
     public var onDeviceUpdate: OnDevicesDidUpdate? {
