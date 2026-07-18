@@ -222,6 +222,22 @@ public class AudioManager: Loggable {
         }
     }
 
+    /// Enables WebRTC's native transient suppressor for keyboard noise.
+    ///
+    /// The AudioEngine device supplies live macOS hardware-key state to WebRTC
+    /// for each microphone capture frame. This is independent of Apple's
+    /// Voice Processing I/O and does not enable it.
+    /// - Note: The WebRTC audio-processing module is shared by local tracks, so
+    ///   the most recently started track's capture option wins.
+    public var isTypingNoiseSuppressionEnabled: Bool {
+        get { RTC.audioProcessingModule.config.isTransientSuppressionEnabled }
+        set {
+            let config = RTC.audioProcessingModule.config
+            config.isTransientSuppressionEnabled = newValue
+            RTC.audioProcessingModule.config = config
+        }
+    }
+
     // MARK: - AudioDeviceModule
 
     public let defaultOutputDevice = AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .output))

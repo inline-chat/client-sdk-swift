@@ -64,7 +64,6 @@ public class LocalAudioTrack: Track, LocalTrackProtocol, AudioTrackProtocol, @un
             "googEchoCancellation": options.echoCancellation.toString(),
             "googAutoGainControl": options.autoGainControl.toString(),
             "googNoiseSuppression": options.noiseSuppression.toString(),
-            "googTypingNoiseDetection": options.typingNoiseDetection.toString(),
             "googHighpassFilter": options.highpassFilter.toString(),
             "echoCancellationMode": options.echoCancellationMode.toConstraintValue(),
             "autoGainControlMode": options.autoGainControlMode.toConstraintValue(),
@@ -116,6 +115,14 @@ public class LocalAudioTrack: Track, LocalTrackProtocol, AudioTrackProtocol, @un
     // MARK: - Internal
 
     override func startCapture() async throws {
+        #if os(macOS)
+        AudioManager.shared.isTypingNoiseSuppressionEnabled = captureOptions.typingNoiseDetection
+        #else
+        // Apple mobile platforms do not provide the per-frame hardware-key
+        // signal required by WebRTC's transient suppressor.
+        AudioManager.shared.isTypingNoiseSuppressionEnabled = false
+        #endif
+
         // AudioDeviceModule's InitRecording() and StartRecording() automatically get called by WebRTC, but
         // explicitly init & start it early to detect audio engine failures (mic not accessible for some reason, etc.).
         try AudioManager.shared.startLocalRecording(
