@@ -10,54 +10,34 @@ The current branch merges upstream LiveKit `2.15.2` at
 software audio-processing API from PR #1048 and keeps Inline's existing local
 muted-track fixes.
 
-## Native typing-noise suppression
+## Audio device module diagnostics
 
-The upstream `AudioCaptureOptions.typingNoiseDetection` constraint does not
-activate typing suppression in WebRTC M144. Inline maps that option to
-`RTCAudioProcessingConfig.isTransientSuppressionEnabled` before microphone
-capture starts.
+Inline exposes the standard audio device module's `isRecording` and
+`isPlaying` facts through `AudioManager`. LiveKit's existing
+`isEngineRunning` API is specific to its custom AudioEngine device and always
+reads false when WebRTC's platform-default audio device is selected.
 
-On macOS, Inline's WebRTC fork supplies live hardware-key state to the audio
-processing module for every captured microphone frame. This is wired into both
-the ordinary AVAudioEngine input sink and the manual-render loop used by
-Inline's AUHAL-backed Grid audio path. Apple mobile platforms force transient
-suppression off because they do not supply that signal. Transient suppression
-is independent of Apple Voice Processing I/O and does not enable VPIO.
-
-WebRTC's audio-processing module is shared by local tracks. If multiple local
-audio tracks use different capture options, the most recently started track's
-typing-noise setting wins.
-
-### Operational characteristics
-
-- The suppressor adds about 11.3 ms of capture delay at 48 kHz and 6 ms at
-  8/16/32 kHz whenever it is configured, including while no key is pressed.
-- Two consecutive 10 ms key-held frames enable suppression. Detection and
-  suppression remain active for about four seconds after typing stops.
-- The macOS audio device scans virtual key codes `0...0x5D` once per capture
-  frame and stops at the first pressed key.
-- Only an `any key is held` boolean reaches WebRTC. Key codes and typed content
-  are neither retained nor passed into audio processing.
+The fork does not modify WebRTC audio processing. In particular, the abandoned
+transient-suppressor experiment is not part of this dependency line.
 
 ## Owned dependency chain
 
-Inline maintains all source and binary inputs needed for this behavior:
+Inline maintains its LiveKit Swift integration while consuming LiveKit's
+official M144 WebRTC binary:
 
-1. https://github.com/inline-chat/webrtc
-2. https://github.com/inline-chat/webrtc-build
-3. https://github.com/inline-chat/webrtc-xcframework
-4. https://github.com/inline-chat/client-sdk-swift
+1. https://github.com/inline-chat/client-sdk-swift
+2. https://github.com/livekit/webrtc-xcframework (`144.7559.11`)
 
 Both `Package.swift` and `Package@swift-6.2.swift` must pin the same immutable
-Inline WebRTC XCFramework release.
+official WebRTC XCFramework release.
 
 ## Upgrade procedure
 
 1. Fetch and merge the intended upstream LiveKit SDK release.
 2. Confirm that LiveKit's software audio-processing API remains present.
-3. Build the matching WebRTC source revision through Inline's owned source,
-   build, and XCFramework repositories.
-4. Update both package manifests to the exact new Inline XCFramework tag.
+3. Verify the intended official LiveKit WebRTC XCFramework release against its
+   matching source revision.
+4. Update both package manifests to the exact official XCFramework tag.
 5. Resolve dependencies and run the LiveKit build, formatting, lint, and
    `AudioProcessingOptionsTests`.
 6. Update Inline's app package to the resulting exact client commit.

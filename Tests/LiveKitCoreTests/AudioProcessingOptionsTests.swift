@@ -15,7 +15,6 @@
  */
 
 @testable import LiveKit
-import LiveKitWebRTC
 import Testing
 
 struct AudioProcessingOptionsTests {
@@ -46,21 +45,6 @@ struct AudioProcessingOptionsTests {
 
     @Test func noProcessingPresetsAgree() {
         #expect(AudioCaptureOptions.noProcessing.audioProcessing == AudioProcessingOptions.noProcessing)
-    }
-
-    @Test func transientSuppressionConfigAppliesToAudioProcessingModule() {
-        let module = LKRTCDefaultAudioProcessingModule(
-            config: nil,
-            capturePostProcessingDelegate: nil,
-            renderPreProcessingDelegate: nil,
-        )
-        #expect(!module.config.isTransientSuppressionEnabled)
-
-        let config = module.config
-        config.isTransientSuppressionEnabled = true
-        module.config = config
-
-        #expect(module.config.isTransientSuppressionEnabled)
     }
 
     @Test func legacyCaptureInitializerDefaultsToAutomaticModes() {

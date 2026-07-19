@@ -217,7 +217,6 @@ extension LKRTCAudioProcessingConfig {
         "RTCAudioProcessingConfig(" +
             "isEchoCancellationEnabled: \(isEchoCancellationEnabled), " +
             "isNoiseSuppressionEnabled: \(isNoiseSuppressionEnabled), " +
-            "isTransientSuppressionEnabled: \(isTransientSuppressionEnabled), " +
             "isAutoGainControl1Enabled: \(isAutoGainControl1Enabled), " +
             "isHighpassFilterEnabled: \(isHighpassFilterEnabled)" +
             ")"

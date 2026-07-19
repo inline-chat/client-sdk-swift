@@ -47,11 +47,6 @@ public final class AudioCaptureOptions: NSObject, CaptureOptions, Sendable {
     /// Whether to enable the high-pass filter.
     public let highpassFilter: Bool
 
-    /// Enables WebRTC's native transient suppressor for typing noise.
-    ///
-    /// On macOS, the AudioEngine device reports live hardware-key state to the
-    /// audio processor for each captured frame. This option is ignored on Apple
-    /// mobile platforms because that key-state signal is unavailable.
     public let typingNoiseDetection: Bool
 
     /// Selects platform versus WebRTC software echo cancellation.
