@@ -23,6 +23,21 @@ import LiveKitTestSupport
 import LiveKitWebRTC
 
 @Suite(.serialized, .tags(.audio)) struct AudioManagerTests {
+    @Test("audio device module selection is idempotent once initialized")
+    func audioDeviceModuleSelectionState() {
+        var state = RTC.PeerConnectionFactoryState()
+
+        let firstSelection = state.selectAudioDeviceModuleType(.platformDefault)
+        state.isInitialized = true
+        let repeatedSelection = state.selectAudioDeviceModuleType(.platformDefault)
+        let incompatibleSelection = state.selectAudioDeviceModuleType(.audioEngine)
+
+        #expect(firstSelection)
+        #expect(repeatedSelection)
+        #expect(!incompatibleSelection)
+        #expect(state.admType == .platformDefault)
+    }
+
     // Test legacy audio device module's startLocalRecording().
     @Test func startLocalRecordingLegacyADM() async throws {
         // Use legacy ADM

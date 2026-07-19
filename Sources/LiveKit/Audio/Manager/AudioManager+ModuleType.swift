@@ -16,7 +16,7 @@
 
 internal import LiveKitWebRTC
 
-public enum AudioDeviceModuleType {
+public enum AudioDeviceModuleType: Equatable {
     /// Use AVAudioEngine-based AudioDeviceModule internally which will be used for all platforms.
     case audioEngine
     /// Use WebRTC's default AudioDeviceModule internally, which uses AudioUnit for iOS, HAL APIs for macOS.
@@ -42,10 +42,17 @@ public extension AudioManager {
     /// Ensure to set session category when accessing the mic:
     /// `try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoChat, options: [])`
     static func set(audioDeviceModuleType: AudioDeviceModuleType) throws {
-        // Throw if pc factory is already initialized.
-        guard !RTC.pcFactoryState.isInitialized else {
+        // Keep the check and mutation in one critical section. Otherwise peer
+        // connection initialization can win between them and create a factory
+        // with a different ADM than the one this call appears to select.
+        //
+        // Reasserting the active type is harmless. A real type change after
+        // initialization remains unsupported.
+        let isCompatible = RTC.pcFactoryState.mutate { state in
+            state.selectAudioDeviceModuleType(audioDeviceModuleType)
+        }
+        guard isCompatible else {
             throw LiveKitError(.invalidState, message: "Cannot set this property after the peer connection has been initialized")
         }
-        RTC.pcFactoryState.mutate { $0.admType = audioDeviceModuleType }
     }
 }

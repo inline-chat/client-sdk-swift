@@ -27,6 +27,12 @@ race. Inline's Grid integration deliberately avoids polling those getters and
 validates route policy using its stable Core Audio catalog plus ADM
 recording/playing state.
 
+Audio-device-module selection is atomic with peer-connection-factory
+initialization. Reasserting the already-active module type is idempotent, while
+attempting to change types after factory initialization still fails. This
+prevents a Room startup race from creating one ADM while the SDK records
+another type.
+
 The fork does not modify WebRTC audio processing. In particular, the abandoned
 transient-suppressor experiment is not part of this dependency line.
 

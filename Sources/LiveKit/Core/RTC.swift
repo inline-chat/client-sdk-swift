@@ -29,6 +29,14 @@ actor RTC {
         var isInitialized: Bool = false
         var admType: AudioDeviceModuleType = .audioEngine
         var bypassVoiceProcessing: Bool = false
+
+        mutating func selectAudioDeviceModuleType(_ type: AudioDeviceModuleType) -> Bool {
+            if isInitialized {
+                return admType == type
+            }
+            admType = type
+            return true
+        }
     }
 
     static let pcFactoryState = StateSync(PeerConnectionFactoryState())
