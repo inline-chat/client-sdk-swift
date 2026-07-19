@@ -168,6 +168,7 @@ public class AudioManager: Loggable {
     public struct State: @unchecked Sendable {
         var engineObservers = [any AudioEngineObserver]()
         var onDevicesDidUpdate: OnDevicesDidUpdate?
+        var deviceUpdateObservers = [UUID: OnDevicesDidUpdate]()
         var onMutedSpeechActivity: OnSpeechActivity?
 
         #if os(iOS) || os(visionOS) || os(tvOS)
@@ -288,11 +289,6 @@ public class AudioManager: Loggable {
     /// AudioEngine device and WebRTC's platform-default audio device.
     public var isRecording: Bool {
         RTC.audioDeviceModule.recording
-    }
-
-    public var onDeviceUpdate: OnDevicesDidUpdate? {
-        get { _state.onDevicesDidUpdate }
-        set { _state.mutate { $0.onDevicesDidUpdate = newValue } }
     }
 
     /// Detect voice activity even if the mic is muted.

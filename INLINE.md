@@ -17,6 +17,16 @@ Inline exposes the standard audio device module's `isRecording` and
 `isEngineRunning` API is specific to its custom AudioEngine device and always
 reads false when WebRTC's platform-default audio device is selected.
 
+`AudioManager.observeDeviceUpdates(_:)` provides independent, token-owned
+device-update observations so one consumer cannot replace another consumer's
+callback. The legacy `onDeviceUpdate` property remains source-compatible.
+
+M144's current-device getters are imported as nonoptional even though their
+Objective-C implementation can return `nil` during a hot-plug enumeration
+race. Inline's Grid integration deliberately avoids polling those getters and
+validates route policy using its stable Core Audio catalog plus ADM
+recording/playing state.
+
 The fork does not modify WebRTC audio processing. In particular, the abandoned
 transient-suppressor experiment is not part of this dependency line.
 
