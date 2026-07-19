@@ -229,6 +229,32 @@ public class AudioManager: Loggable {
 
     public let defaultInputDevice = AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .input))
 
+    /// Selects WebRTC's index-zero input policy, which follows the current
+    /// macOS system-default device.
+    ///
+    /// This must not be implemented by assigning ``defaultInputDevice``:
+    /// depending on the platform ADM's enumeration state, its synthetic
+    /// `"default"` identifier may not appear in ``inputDevices``.
+    @discardableResult
+    public func selectDefaultInputDevice() -> Bool {
+        #if os(macOS)
+        RTC.audioDeviceModule.trySetInputDevice(nil)
+        #else
+        false
+        #endif
+    }
+
+    /// Selects WebRTC's index-zero output policy, which follows the current
+    /// macOS system-default device.
+    @discardableResult
+    public func selectDefaultOutputDevice() -> Bool {
+        #if os(macOS)
+        RTC.audioDeviceModule.trySetOutputDevice(nil)
+        #else
+        false
+        #endif
+    }
+
     public var outputDevices: [AudioDevice] {
         #if os(macOS)
         RTC.audioDeviceModule.outputDevices.map { AudioDevice(ioDevice: $0) }
