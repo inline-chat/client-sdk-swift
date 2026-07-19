@@ -24,14 +24,6 @@ private final class VideoDecoderFactory: LKRTCDefaultVideoDecoderFactory, @unche
 
 private final class VideoEncoderFactorySimulcast: LKRTCVideoEncoderFactorySimulcast, @unchecked Sendable {}
 
-private final class AudioDeviceModulePreparationSource: @unchecked Sendable {
-    let value: LKRTCAudioSource
-
-    init(_ value: LKRTCAudioSource) {
-        self.value = value
-    }
-}
-
 actor RTC {
     struct PeerConnectionFactoryState {
         var isInitialized: Bool = false
@@ -61,14 +53,6 @@ actor RTC {
     static let decoderFactory: LKRTCVideoDecoderFactory & Sendable = VideoDecoderFactory()
 
     static let audioProcessingModule: LKRTCDefaultAudioProcessingModule = .init()
-
-    /// Retaining one source initializes the media engine and its ADM without
-    /// creating a peer connection or starting capture.
-    private static let audioDeviceModulePreparationSource = AudioDeviceModulePreparationSource(createAudioSource(nil))
-
-    static func prepareAudioDeviceModule() {
-        _ = audioDeviceModulePreparationSource
-    }
 
     static let videoSenderCapabilities = peerConnectionFactory.rtpSenderCapabilities(forKind: kLKRTCMediaStreamTrackKindVideo)
     static let audioSenderCapabilities = peerConnectionFactory.rtpSenderCapabilities(forKind: kLKRTCMediaStreamTrackKindAudio)

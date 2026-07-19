@@ -108,16 +108,6 @@ public class AudioManager: Loggable {
         _ = shared
     }
 
-    /// Initializes WebRTC's media engine and audio device module without
-    /// creating a peer connection or starting capture.
-    ///
-    /// Call this after selecting the process-wide audio device module type and
-    /// before enumerating or selecting devices on the platform-default ADM.
-    public static func prepareAudioDeviceModule() {
-        _ = shared
-        RTC.prepareAudioDeviceModule()
-    }
-
     public typealias OnDevicesDidUpdate = @Sendable (_ audioManager: AudioManager) -> Void
 
     public typealias OnSpeechActivity = @Sendable (_ audioManager: AudioManager, _ event: SpeechActivityEvent) -> Void
@@ -238,32 +228,6 @@ public class AudioManager: Loggable {
     public let defaultOutputDevice = AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .output))
 
     public let defaultInputDevice = AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .input))
-
-    /// Selects WebRTC's index-zero input policy, which follows the current
-    /// macOS system-default device.
-    ///
-    /// This must not be implemented by assigning ``defaultInputDevice``:
-    /// depending on the platform ADM's enumeration state, its synthetic
-    /// `"default"` identifier may not appear in ``inputDevices``.
-    @discardableResult
-    public func selectDefaultInputDevice() -> Bool {
-        #if os(macOS)
-        RTC.audioDeviceModule.trySetInputDevice(nil)
-        #else
-        false
-        #endif
-    }
-
-    /// Selects WebRTC's index-zero output policy, which follows the current
-    /// macOS system-default device.
-    @discardableResult
-    public func selectDefaultOutputDevice() -> Bool {
-        #if os(macOS)
-        RTC.audioDeviceModule.trySetOutputDevice(nil)
-        #else
-        false
-        #endif
-    }
 
     public var outputDevices: [AudioDevice] {
         #if os(macOS)
