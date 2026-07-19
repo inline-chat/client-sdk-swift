@@ -33,6 +33,10 @@ attempting to change types after factory initialization still fails. This
 prevents a Room startup race from creating one ADM while the SDK records
 another type.
 
+`AudioManager.selectDefaultInputDevice()` exposes the stock macOS ADM's
+index-zero input policy after a real WebRTC transport initializes the ADM. It
+is used when returning from an explicit microphone to system-default policy.
+
 The fork does not modify WebRTC audio processing. In particular, the abandoned
 transient-suppressor experiment is not part of this dependency line.
 
