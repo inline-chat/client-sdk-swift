@@ -108,6 +108,16 @@ public class AudioManager: Loggable {
         _ = shared
     }
 
+    /// Initializes WebRTC's media engine and audio device module without
+    /// creating a peer connection or starting capture.
+    ///
+    /// Call this after selecting the process-wide audio device module type and
+    /// before enumerating or selecting devices on the platform-default ADM.
+    public static func prepareAudioDeviceModule() {
+        _ = shared
+        RTC.prepareAudioDeviceModule()
+    }
+
     public typealias OnDevicesDidUpdate = @Sendable (_ audioManager: AudioManager) -> Void
 
     public typealias OnSpeechActivity = @Sendable (_ audioManager: AudioManager, _ event: SpeechActivityEvent) -> Void

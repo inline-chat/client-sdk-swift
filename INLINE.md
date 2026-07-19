@@ -38,6 +38,11 @@ another type.
 They do not assume the synthetic `"default"` object is present in the current
 device enumeration.
 
+`AudioManager.prepareAudioDeviceModule()` initializes WebRTC's normal media
+engine by retaining an audio source. This makes standard-ADM enumeration and
+route selection valid before a Room creates its first peer connection, without
+starting capture or modifying WebRTC core.
+
 The fork does not modify WebRTC audio processing. In particular, the abandoned
 transient-suppressor experiment is not part of this dependency line.
 
