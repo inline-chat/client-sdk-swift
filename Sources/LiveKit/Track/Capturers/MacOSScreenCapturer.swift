@@ -34,14 +34,18 @@ internal import LKObjCHelpers
 @available(macOS 12.3, *)
 public class MacOSScreenCapturer: VideoCapturer, @unchecked Sendable {
     private let capturer = RTC.createVideoCapturer()
+    private let _captureSerialRunner = SerialRunnerActor<Bool>()
 
-    // TODO: Make it possible to change dynamically
-    public let captureSource: MacOSScreenCaptureSource?
+    /// The display or window currently captured by this stream.
+    public var captureSource: MacOSScreenCaptureSource? {
+        _screenCapturerState.captureSource
+    }
 
     /// The ``ScreenShareCaptureOptions`` used for this capturer.
     public let options: ScreenShareCaptureOptions
 
     struct State {
+        var captureSource: MacOSScreenCaptureSource?
         // SCStream
         var scStream: SCStream?
         // Cached frame for resending to maintain minimum of 1 fps
@@ -49,15 +53,22 @@ public class MacOSScreenCapturer: VideoCapturer, @unchecked Sendable {
         var resendTimer: AnyTaskCancellable?
     }
 
-    private var _screenCapturerState = StateSync(State())
+    private let _screenCapturerState: StateSync<State>
 
     init(delegate: LKRTCVideoCapturerDelegate, captureSource: MacOSScreenCaptureSource, options: ScreenShareCaptureOptions) {
-        self.captureSource = captureSource
         self.options = options
+        _screenCapturerState = StateSync(State(captureSource: captureSource))
         super.init(delegate: delegate)
     }
 
     override public func startCapture() async throws -> Bool {
+        try await _captureSerialRunner.run { [weak self] in
+            guard let self else { return false }
+            return try await self.startCaptureSerialized()
+        }
+    }
+
+    private func startCaptureSerialized() async throws -> Bool {
         let didStart = try await super.startCapture()
 
         // Already started
@@ -68,26 +79,7 @@ public class MacOSScreenCapturer: VideoCapturer, @unchecked Sendable {
             throw LiveKitError(.invalidState, message: "captureSource is nil")
         }
 
-        let filter: SCContentFilter
-        if let windowSource = captureSource as? MacOSWindow,
-           let nativeWindowSource = windowSource.nativeType as? SCWindow
-        {
-            filter = SCContentFilter(desktopIndependentWindow: nativeWindowSource)
-        } else if let displaySource = captureSource as? MacOSDisplay,
-                  let content = displaySource.scContent as? SCShareableContent,
-                  let nativeDisplay = displaySource.nativeType as? SCDisplay
-        {
-            let includedApps = options.includeCurrentApplication ?
-                content.applications :
-                content.applications.filter { app in Bundle.main.bundleIdentifier != app.bundleIdentifier }
-
-            let excludedWindows = content.windows.filter { window in options.excludeWindowIDs.contains(window.windowID) }
-
-            filter = SCContentFilter(display: nativeDisplay, including: includedApps, exceptingWindows: excludedWindows)
-        } else {
-            log("Unable to resolve SCContentFilter", .error)
-            throw LiveKitError(.invalidState, message: "Unable to resolve SCContentFilter")
-        }
+        let filter = try makeContentFilter(for: captureSource)
 
         let configuration = SCStreamConfiguration()
 
@@ -125,7 +117,36 @@ public class MacOSScreenCapturer: VideoCapturer, @unchecked Sendable {
         return true
     }
 
+    private func makeContentFilter(for captureSource: MacOSScreenCaptureSource) throws -> SCContentFilter {
+        if let windowSource = captureSource as? MacOSWindow,
+           let nativeWindowSource = windowSource.nativeType as? SCWindow
+        {
+            return SCContentFilter(desktopIndependentWindow: nativeWindowSource)
+        } else if let displaySource = captureSource as? MacOSDisplay,
+                  let content = displaySource.scContent as? SCShareableContent,
+                  let nativeDisplay = displaySource.nativeType as? SCDisplay
+        {
+            let includedApps = options.includeCurrentApplication ?
+                content.applications :
+                content.applications.filter { app in Bundle.main.bundleIdentifier != app.bundleIdentifier }
+
+            let excludedWindows = content.windows.filter { window in options.excludeWindowIDs.contains(window.windowID) }
+
+            return SCContentFilter(display: nativeDisplay, including: includedApps, exceptingWindows: excludedWindows)
+        } else {
+            log("Unable to resolve SCContentFilter", .error)
+            throw LiveKitError(.invalidState, message: "Unable to resolve SCContentFilter")
+        }
+    }
+
     override public func stopCapture() async throws -> Bool {
+        try await _captureSerialRunner.run { [weak self] in
+            guard let self else { return false }
+            return try await self.stopCaptureSerialized()
+        }
+    }
+
+    private func stopCaptureSerialized() async throws -> Bool {
         let didStop = try await super.stopCapture()
 
         // Already stopped
@@ -148,6 +169,39 @@ public class MacOSScreenCapturer: VideoCapturer, @unchecked Sendable {
         }
 
         return true
+    }
+
+    /// Changes the source of an active ScreenCaptureKit stream without stopping
+    /// the local track or replacing its WebRTC sender.
+    public func updateCaptureSource(_ captureSource: MacOSScreenCaptureSource) async throws {
+        let boxedSource = UncheckedMacOSScreenCaptureSource(captureSource)
+        _ = try await _captureSerialRunner.run { [weak self] in
+            guard let self else { return false }
+            try await self.updateCaptureSourceSerialized(boxedSource.value)
+            return true
+        }
+    }
+
+    private func updateCaptureSourceSerialized(_ captureSource: MacOSScreenCaptureSource) async throws {
+        let currentSource = _screenCapturerState.captureSource
+        if let currentSource,
+           (currentSource as AnyObject) === (captureSource as AnyObject)
+        {
+            return
+        }
+
+        guard let stream = _screenCapturerState.scStream else {
+            _screenCapturerState.mutate { $0.captureSource = captureSource }
+            return
+        }
+
+        let filter = try makeContentFilter(for: captureSource)
+        try await stream.updateContentFilter(filter)
+        _screenCapturerState.mutate {
+            $0.captureSource = captureSource
+            $0.lastFrame = nil
+            $0.resendTimer = nil
+        }
     }
 
     // Common capture func
@@ -183,6 +237,15 @@ public class MacOSScreenCapturer: VideoCapturer, @unchecked Sendable {
         }
 
         capture(frame: rtcFrame, capturer: capturer, options: options)
+    }
+}
+
+@available(macOS 12.3, *)
+private final class UncheckedMacOSScreenCaptureSource: @unchecked Sendable {
+    let value: MacOSScreenCaptureSource
+
+    init(_ value: MacOSScreenCaptureSource) {
+        self.value = value
     }
 }
 
