@@ -38,6 +38,13 @@ zero-on-success return code. Inline does not expose those unreliable Boolean
 results. Consumers select the enumerated `defaultInputDevice` through the
 ordinary `inputDevice` setter and validate the resulting capture operation.
 
+On macOS, `AudioManager.stopLocalPlayout()` and `startLocalPlayout()` expose
+only the stock ADM's existing stop and init/start lifecycle. Grid uses these
+calls to bracket microphone changes that alter a Bluetooth output profile.
+This prevents M144 from rebuilding an output converter in place while Core
+Audio is pausing and resuming the stream; it does not replace or patch the
+platform ADM.
+
 The fork does not modify WebRTC audio processing. In particular, the abandoned
 transient-suppressor experiment is not part of this dependency line.
 
