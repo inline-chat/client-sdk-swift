@@ -275,6 +275,36 @@ public class AudioManager: Loggable {
         }
     }
 
+    /// Safe current output-device readback for route verification.
+    ///
+    /// WebRTC's Objective-C getter can transiently return `nil` during device
+    /// churn even though its imported Swift signature is nonoptional. KVC
+    /// preserves the underlying nullability and avoids constructing an
+    /// `AudioDevice` around a missing native object.
+    public var currentOutputDevice: AudioDevice? {
+        #if os(macOS)
+        let module = RTC.audioDeviceModule as NSObject
+        guard let device = module.value(forKey: "outputDevice") as? LKRTCIODevice
+        else { return nil }
+        return AudioDevice(ioDevice: device)
+        #else
+        return nil
+        #endif
+    }
+
+    /// Safe current input-device readback for route verification. See
+    /// ``currentOutputDevice`` for the Objective-C nullability rationale.
+    public var currentInputDevice: AudioDevice? {
+        #if os(macOS)
+        let module = RTC.audioDeviceModule as NSObject
+        guard let device = module.value(forKey: "inputDevice") as? LKRTCIODevice
+        else { return nil }
+        return AudioDevice(ioDevice: device)
+        #else
+        return nil
+        #endif
+    }
+
     /// Whether the standard audio device module is actively rendering audio.
     ///
     /// Unlike ``isEngineRunning``, this is meaningful for both the custom
