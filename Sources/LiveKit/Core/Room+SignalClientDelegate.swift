@@ -61,7 +61,7 @@ extension Room: SignalClientDelegate {
             // Abort current attempt
             await signalClient.cleanUp(withError: error)
         case .disconnect:
-            await cleanUp(withError: error)
+            await performTerminalCleanup(withError: error)
         default:
             log("Unknown leave action: \(action), ignoring", .warning)
         }

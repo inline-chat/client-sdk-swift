@@ -91,6 +91,18 @@ import LiveKitTestSupport
         try await Task.sleep(nanoseconds: 1_000_000_000)
     }
 
+    @Test func localDisconnectReleasesRoomWithoutGracefulLeave() async throws {
+        try await TestEnvironment.withRoom { room in
+            #expect(room.connectionState == .connected)
+
+            await room.disconnectLocally()
+
+            #expect(room.connectionState == .disconnected)
+            #expect(await room.signalClient._state.socket == nil)
+            #expect(await room.signalClient.connectionState == .disconnected)
+        }
+    }
+
     @Test func sendDataPacket() async throws {
         try await TestEnvironment.withRoom { room in
             try await confirmation("Should send data packet") { confirm in

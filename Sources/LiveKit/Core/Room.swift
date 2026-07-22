@@ -237,6 +237,7 @@ public class Room: NSObject, @unchecked Sendable, ObservableObject, Loggable {
     }
 
     let _state: StateSync<State>
+    private let _terminalCleanup = StateSync<AsyncCompleter<Void>?>(nil)
 
     private let _sidCompleter = AsyncCompleter<Sid>(label: "sid", defaultTimeout: .resolveSid)
 
@@ -496,7 +497,7 @@ public class Room: NSObject, @unchecked Sendable, ObservableObject, Loggable {
                 try? await track.stop()
             }
 
-            await cleanUp(withError: error)
+            await performTerminalCleanup(withError: error)
             throw error // Re-throw the original error
         }
 
@@ -525,9 +526,70 @@ public class Room: NSObject, @unchecked Sendable, ObservableObject, Loggable {
 
         cancelReconnect()
 
-        await cleanUp()
+        await performTerminalCleanup()
 
         cancelReconnect()
+    }
+
+    /// Immediately tears down this room's local media and transports without
+    /// waiting for a signaling leave acknowledgement.
+    ///
+    /// Use this for process shutdown and failure recovery where microphone,
+    /// playout, publications, and peer connections must be released even when
+    /// the provider is unreachable. The server observes the underlying
+    /// transport closure; callers that require a graceful leave should use
+    /// ``disconnect()`` instead.
+    public func disconnectLocally() async {
+        let shouldDisconnect = _state.mutate {
+            switch $0.connectionState {
+            case .disconnected:
+                return false
+            case .disconnecting:
+                return true
+            default:
+                $0.connectionState = .disconnecting
+                return true
+            }
+        }
+        guard shouldDisconnect else { return }
+
+        cancelReconnect()
+        await performTerminalCleanup()
+        cancelReconnect()
+    }
+
+    /// Serializes terminal cleanup when a bounded local disconnect overtakes
+    /// an already-running graceful disconnect. `cleanUp()` mutates tracks,
+    /// transports, completers and participant state and must not run twice at
+    /// the same time for one Room.
+    @nonobjc func performTerminalCleanup(withError disconnectError: Error? = nil) async {
+        let (completer, ownsCleanup) = _terminalCleanup.mutate { current in
+            if let current {
+                return (current, false)
+            }
+            let completer = AsyncCompleter<Void>(
+                label: "Room.terminalCleanup",
+                defaultTimeout: 30
+            )
+            current = completer
+            return (completer, true)
+        }
+
+        guard ownsCleanup else {
+            _ = try? await completer.wait()
+            return
+        }
+
+        await cleanUp(withError: disconnectError)
+        // Resolve waiters before making the slot available again. Clearing the
+        // slot first would allow a new caller to start a second cleanUp() in the
+        // narrow interval before this completer is resumed.
+        completer.resume(returning: ())
+        _terminalCleanup.mutate { current in
+            if current === completer {
+                current = nil
+            }
+        }
     }
 
     private func cancelReconnect() {
