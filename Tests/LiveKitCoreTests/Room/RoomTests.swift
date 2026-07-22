@@ -100,6 +100,14 @@ import LiveKitTestSupport
             #expect(room.connectionState == .disconnected)
             #expect(await room.signalClient._state.socket == nil)
             #expect(await room.signalClient.connectionState == .disconnected)
+
+            // A retained provider mutation may return after the first local
+            // teardown. Repeating the barrier must be safe and must still
+            // leave every transport locally disconnected.
+            await room.disconnectLocally()
+            #expect(room.connectionState == .disconnected)
+            #expect(await room.signalClient._state.socket == nil)
+            #expect(await room.signalClient.connectionState == .disconnected)
         }
     }
 
@@ -136,6 +144,21 @@ import LiveKitTestSupport
                 try await room.localParticipant.publishDtmf(code: 10, digit: "*")
             }
         }
+    }
+}
+
+@Suite(.serialized) final class RoomLocalDisconnectTests: @unchecked Sendable {
+    @Test func repeatedLocalDisconnectIsSafeForAnAlreadyDisconnectedRoom() async {
+        let room = Room()
+
+        await room.disconnectLocally()
+        await room.disconnectLocally()
+
+        #expect(room.connectionState == .disconnected)
+        #expect(await room.signalClient._state.socket == nil)
+        #expect(await room.signalClient.connectionState == .disconnected)
+        #expect(room.localParticipant.localAudioTracks.isEmpty)
+        #expect(room.localParticipant.localVideoTracks.isEmpty)
     }
 }
 

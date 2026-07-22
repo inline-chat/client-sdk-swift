@@ -540,19 +540,17 @@ public class Room: NSObject, @unchecked Sendable, ObservableObject, Loggable {
     /// transport closure; callers that require a graceful leave should use
     /// ``disconnect()`` instead.
     public func disconnectLocally() async {
-        let shouldDisconnect = _state.mutate {
-            switch $0.connectionState {
-            case .disconnected:
-                return false
-            case .disconnecting:
-                return true
-            default:
+        _state.mutate {
+            if $0.connectionState != .disconnected {
                 $0.connectionState = .disconnecting
-                return true
             }
         }
-        guard shouldDisconnect else { return }
 
+        // Repeat terminal cleanup even after the room already reports
+        // disconnected. A cancellation-insensitive publish/mute operation can
+        // return after the first local teardown and repopulate participant or
+        // track state. The caller retains mutation ownership until that return,
+        // then invokes this idempotent cleanup again before claiming quiescence.
         cancelReconnect()
         await performTerminalCleanup()
         cancelReconnect()
@@ -569,7 +567,7 @@ public class Room: NSObject, @unchecked Sendable, ObservableObject, Loggable {
             }
             let completer = AsyncCompleter<Void>(
                 label: "Room.terminalCleanup",
-                defaultTimeout: 30
+                defaultTimeout: 30,
             )
             current = completer
             return (completer, true)
