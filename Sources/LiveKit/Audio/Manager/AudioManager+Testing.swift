@@ -27,8 +27,16 @@ extension AudioManager {
         RTC.audioDeviceModule.isPlayoutInitialized
     }
 
+    var isPlaying: Bool {
+        RTC.audioDeviceModule.isPlaying
+    }
+
     var isRecordingInitialized: Bool {
         RTC.audioDeviceModule.isRecordingInitialized
+    }
+
+    var isRecording: Bool {
+        RTC.audioDeviceModule.isRecording
     }
 
     @discardableResult

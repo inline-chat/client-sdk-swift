@@ -60,7 +60,7 @@ open class LocalMedia: ObservableObject, Loggable {
     /// The available audio input devices.
     @Published public private(set) var audioDevices: [AudioDevice] = AudioManager.shared.inputDevices
     /// The ID of the selected audio input device.
-    @Published public private(set) var selectedAudioDeviceID: String = AudioManager.shared.defaultInputDevice.deviceId
+    @Published public private(set) var selectedAudioDeviceID: String = AudioManager.shared.inputDevice.deviceId
 
     /// The available video capture devices.
     @Published public private(set) var videoDevices: [AVCaptureDevice] = []
@@ -74,7 +74,6 @@ open class LocalMedia: ObservableObject, Loggable {
 
     private var localParticipant: LocalParticipant
     private var tasks = Set<AnyTaskCancellable>()
-    private var deviceUpdateObserver: AudioDeviceUpdateObserverHandle?
 
     // MARK: - Initialization
 
@@ -121,7 +120,7 @@ open class LocalMedia: ObservableObject, Loggable {
             }
         }
 
-        deviceUpdateObserver = AudioManager.shared.observeDeviceUpdates { [weak self] _ in
+        AudioManager.shared.onDeviceUpdate = { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.audioDevices = AudioManager.shared.inputDevices
                 self?.selectedAudioDeviceID = AudioManager.shared.defaultInputDevice.deviceId
@@ -137,6 +136,10 @@ open class LocalMedia: ObservableObject, Loggable {
                 log("Failed to configure camera devices: \(error)", .error)
             }
         }
+    }
+
+    deinit {
+        AudioManager.shared.onDeviceUpdate = nil
     }
 
     /// Resets the last error.

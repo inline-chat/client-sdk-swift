@@ -1,5 +1,33 @@
 # Audio
 
+## Custom physical audio devices
+
+Applications that own their physical audio IO can provide a process-wide
+`CustomAudioDevice`. LiveKit still owns peer connections and WebRTC still owns
+10 ms buffering, transport, and audio processing; the custom device owns only
+recording and playout.
+
+```swift
+let device = MyCustomAudioDevice()
+try AudioManager.set(customAudioDevice: device)
+```
+
+Configure the device before creating a `Room` or using another API that lazily
+initializes WebRTC's peer-connection factory. Reasserting the same device
+instance is allowed. Selecting another device or ADM after initialization
+throws an invalid-state error.
+
+The device receives a `CustomAudioDeviceDelegate` during initialization. Use
+`getPlayoutData` directly from the physical output callback and
+`deliverRecordedData` directly from the physical input callback. Both use
+16-bit interleaved PCM and physical `AudioTimeStamp` values. Device route or
+format mutations must notify WebRTC through the delegate's interruption and
+parameter-change methods on the native ADM dispatch context.
+
+Real-time callbacks must not allocate, lock, wait on a queue, or log. Device
+lifecycle methods should return success only after physical IO reaches the
+reported state.
+
 ## Disabling automatic `AVAudioSession` configuration
 
 By default, the SDK automatically configures the `AVAudioSession`. However, this can interfere with your own configuration or with frameworks like CallKit that configure the AVAudioSession automatically. In such cases, you can disable automatic configuration by the SDK.

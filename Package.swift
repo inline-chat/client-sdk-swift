@@ -31,12 +31,20 @@ let package = Package(
             publicHeadersPath: "include",
         ),
         .target(
+            name: "LKRTCAudioDeviceCompat",
+            dependencies: [
+                .product(name: "LiveKitWebRTC", package: "webrtc-xcframework"),
+            ],
+            publicHeadersPath: "include",
+        ),
+        .target(
             name: "LiveKit",
             dependencies: [
                 .product(name: "LiveKitWebRTC", package: "webrtc-xcframework"),
                 .product(name: "LiveKitUniFFI", package: "livekit-uniffi-xcframework"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "LKObjCHelpers",
+                "LKRTCAudioDeviceCompat",
             ],
             exclude: [
                 "Broadcast/NOTICE",

@@ -42,14 +42,26 @@ public extension AudioManager {
     /// Ensure to set session category when accessing the mic:
     /// `try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoChat, options: [])`
     static func set(audioDeviceModuleType: AudioDeviceModuleType) throws {
-        // Keep the check and mutation in one critical section. Otherwise peer
-        // connection initialization can win between them and create a factory
-        // with a different ADM than the one this call appears to select.
-        //
-        // Reasserting the active type is harmless. A real type change after
-        // initialization remains unsupported.
-        let isCompatible = RTC.pcFactoryState.mutate { state in
-            state.selectAudioDeviceModuleType(audioDeviceModuleType)
+        let isCompatible = RTC.pcFactoryState.mutate {
+            $0.selectAudioDeviceModuleType(audioDeviceModuleType)
+        }
+        guard isCompatible else {
+            throw LiveKitError(.invalidState, message: "Cannot set this property after the peer connection has been initialized")
+        }
+    }
+
+    /// Installs a process-wide custom physical audio device.
+    ///
+    /// This method must be called before the peer-connection factory is
+    /// initialized. Reasserting the same device instance is idempotent; changing
+    /// the device after initialization throws an invalid-state error.
+    ///
+    /// LiveKit strongly retains the device for the peer-connection factory's
+    /// lifetime. The device is responsible for physical recording and playout;
+    /// WebRTC continues to own transport, buffering, and audio processing.
+    static func set(customAudioDevice: any CustomAudioDevice) throws {
+        let isCompatible = RTC.pcFactoryState.mutate {
+            $0.selectCustomAudioDevice(customAudioDevice)
         }
         guard isCompatible else {
             throw LiveKitError(.invalidState, message: "Cannot set this property after the peer connection has been initialized")

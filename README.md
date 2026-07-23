@@ -10,10 +10,6 @@
 
 # iOS/macOS Swift SDK for LiveKit
 
-> [!NOTE]
-> This is Inline's maintained fork. See [INLINE.md](INLINE.md) for its upstream
-> base, owned WebRTC dependency chain, and upgrade procedure.
-
 <!--BEGIN_DESCRIPTION-->
 Use this SDK to add realtime video, audio and data features to your Swift app. By connecting to <a href="https://livekit.io/">LiveKit</a> Cloud or a self-hosted server, you can quickly build applications such as multi-modal AI, live streaming, or video calls with just a few lines of code.
 <!--END_DESCRIPTION-->

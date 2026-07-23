@@ -29,12 +29,22 @@ actor RTC {
         var isInitialized: Bool = false
         var admType: AudioDeviceModuleType = .audioEngine
         var bypassVoiceProcessing: Bool = false
+        var customAudioDevice: (any CustomAudioDevice)?
 
         mutating func selectAudioDeviceModuleType(_ type: AudioDeviceModuleType) -> Bool {
             if isInitialized {
-                return admType == type
+                return customAudioDevice == nil && admType == type
             }
             admType = type
+            customAudioDevice = nil
+            return true
+        }
+
+        mutating func selectCustomAudioDevice(_ device: any CustomAudioDevice) -> Bool {
+            if isInitialized {
+                return customAudioDevice === device
+            }
+            customAudioDevice = device
             return true
         }
     }
@@ -59,9 +69,9 @@ actor RTC {
 
     static let peerConnectionFactory: LKRTCPeerConnectionFactory = {
         // Update pc init lock
-        let (admType, bypassVoiceProcessing) = pcFactoryState.mutate {
+        let (admType, bypassVoiceProcessing, customAudioDevice) = pcFactoryState.mutate {
             $0.isInitialized = true
-            return ($0.admType, $0.bypassVoiceProcessing)
+            return ($0.admType, $0.bypassVoiceProcessing, $0.customAudioDevice)
         }
 
         Room.log("Initializing SSL...")
@@ -69,6 +79,12 @@ actor RTC {
         LKRTCInitializeSSL()
 
         Room.log("Initializing PeerConnectionFactory...")
+
+        if let customAudioDevice {
+            return LKRTCPeerConnectionFactory(encoderFactory: encoderFactory,
+                                              decoderFactory: decoderFactory,
+                                              audioDevice: RTCCustomAudioDeviceAdapter(device: customAudioDevice))
+        }
 
         return LKRTCPeerConnectionFactory(audioDeviceModuleType: admType.toRTCType(),
                                           bypassVoiceProcessing: bypassVoiceProcessing,

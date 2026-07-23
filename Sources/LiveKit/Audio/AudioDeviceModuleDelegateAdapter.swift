@@ -29,7 +29,7 @@ class AudioDeviceModuleDelegateAdapter: NSObject, LKRTCAudioDeviceModuleDelegate
 
     func audioDeviceModuleDidUpdateDevices(_: LKRTCAudioDeviceModule) {
         guard let audioManager else { return }
-        audioManager.notifyDevicesDidUpdate()
+        audioManager._state.onDevicesDidUpdate?(audioManager)
     }
 
     // Engine events

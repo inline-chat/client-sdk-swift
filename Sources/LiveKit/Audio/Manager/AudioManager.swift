@@ -168,7 +168,6 @@ public class AudioManager: Loggable {
     public struct State: @unchecked Sendable {
         var engineObservers = [any AudioEngineObserver]()
         var onDevicesDidUpdate: OnDevicesDidUpdate?
-        var deviceUpdateObservers = [UUID: OnDevicesDidUpdate]()
         var onMutedSpeechActivity: OnSpeechActivity?
 
         #if os(iOS) || os(visionOS) || os(tvOS)
@@ -273,6 +272,11 @@ public class AudioManager: Loggable {
             RTC.audioDeviceModule.inputDevice = newValue._ioDevice
             #endif
         }
+    }
+
+    public var onDeviceUpdate: OnDevicesDidUpdate? {
+        get { _state.onDevicesDidUpdate }
+        set { _state.mutate { $0.onDevicesDidUpdate = newValue } }
     }
 
     /// Detect voice activity even if the mic is muted.

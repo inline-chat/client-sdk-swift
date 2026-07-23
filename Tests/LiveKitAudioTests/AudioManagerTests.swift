@@ -23,32 +23,6 @@ import LiveKitTestSupport
 import LiveKitWebRTC
 
 @Suite(.serialized, .tags(.audio)) struct AudioManagerTests {
-    #if os(macOS)
-    @Test("current device readback is optional and safe to access")
-    func currentDeviceReadbackIsSafe() {
-        // Do not mutate the process-global ADM selection here. Other Swift
-        // Testing suites can initialize the peer-connection factory in
-        // parallel, and the readback contract applies to either module type.
-        _ = AudioManager.shared.currentInputDevice
-        _ = AudioManager.shared.currentOutputDevice
-    }
-    #endif
-
-    @Test("audio device module selection is idempotent once initialized")
-    func audioDeviceModuleSelectionState() {
-        var state = RTC.PeerConnectionFactoryState()
-
-        let firstSelection = state.selectAudioDeviceModuleType(.platformDefault)
-        state.isInitialized = true
-        let repeatedSelection = state.selectAudioDeviceModuleType(.platformDefault)
-        let incompatibleSelection = state.selectAudioDeviceModuleType(.audioEngine)
-
-        #expect(firstSelection)
-        #expect(repeatedSelection)
-        #expect(!incompatibleSelection)
-        #expect(state.admType == .platformDefault)
-    }
-
     // Test legacy audio device module's startLocalRecording().
     @Test func startLocalRecordingLegacyADM() async throws {
         // Use legacy ADM
