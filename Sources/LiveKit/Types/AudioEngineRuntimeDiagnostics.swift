@@ -30,6 +30,14 @@ public struct AudioEngineRuntimeDiagnostics: Equatable, Sendable {
     public let recordingCallbackAgeMilliseconds: UInt64
     public let measuredPlayoutDelayMilliseconds: UInt16
     public let measuredRecordingDelayMilliseconds: UInt16
+    /// Sample rate committed to the current WebRTC playout graph generation.
+    /// Zero means no playout graph is configured.
+    public let configuredPlayoutSampleRate: Double
+    /// Sample rate committed to the current WebRTC recording graph generation.
+    /// Zero means no recording graph is configured.
+    public let configuredRecordingSampleRate: Double
+    public let configuredPlayoutChannels: UInt32
+    public let configuredRecordingChannels: UInt32
 
     init(native: LKRTCAudioEngineRuntimeDiagnostics) {
         playoutCallbackSeen = native.playoutCallbackSeen.boolValue
@@ -40,5 +48,9 @@ public struct AudioEngineRuntimeDiagnostics: Equatable, Sendable {
         recordingCallbackAgeMilliseconds = native.recordingCallbackAgeMilliseconds
         measuredPlayoutDelayMilliseconds = native.measuredPlayoutDelayMilliseconds
         measuredRecordingDelayMilliseconds = native.measuredRecordingDelayMilliseconds
+        configuredPlayoutSampleRate = native.configuredPlayoutSampleRate
+        configuredRecordingSampleRate = native.configuredRecordingSampleRate
+        configuredPlayoutChannels = native.configuredPlayoutChannels
+        configuredRecordingChannels = native.configuredRecordingChannels
     }
 }
