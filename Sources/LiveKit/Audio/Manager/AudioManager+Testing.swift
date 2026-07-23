@@ -19,53 +19,53 @@ internal import LiveKitWebRTC
 // Only internal testing.
 extension AudioManager {
     var engineState: LKRTCAudioEngineState {
-        get { RTC.audioDeviceModule.engineState }
-        set { RTC.audioDeviceModule.engineState = newValue }
+        get { RTC.audioDeviceModule?.engineState ?? LKRTCAudioEngineState() }
+        set { RTC.audioDeviceModule?.engineState = newValue }
     }
 
     var isPlayoutInitialized: Bool {
-        RTC.audioDeviceModule.isPlayoutInitialized
+        RTC.audioDeviceModule?.isPlayoutInitialized ?? false
     }
 
     var isPlaying: Bool {
-        RTC.audioDeviceModule.isPlaying
+        RTC.audioDeviceModule?.isPlaying ?? false
     }
 
     var isRecordingInitialized: Bool {
-        RTC.audioDeviceModule.isRecordingInitialized
+        RTC.audioDeviceModule?.isRecordingInitialized ?? false
     }
 
     var isRecording: Bool {
-        RTC.audioDeviceModule.isRecording
+        RTC.audioDeviceModule?.isRecording ?? false
     }
 
     @discardableResult
     func initPlayout() -> Int {
-        RTC.audioDeviceModule.initPlayout()
+        RTC.audioDeviceModule?.initPlayout() ?? -1
     }
 
     @discardableResult
     func startPlayout() -> Int {
-        RTC.audioDeviceModule.startPlayout()
+        RTC.audioDeviceModule?.startPlayout() ?? -1
     }
 
     @discardableResult
     func stopPlayout() -> Int {
-        RTC.audioDeviceModule.stopPlayout()
+        RTC.audioDeviceModule?.stopPlayout() ?? -1
     }
 
     @discardableResult
     func initRecording() -> Int {
-        RTC.audioDeviceModule.initRecording()
+        RTC.audioDeviceModule?.initRecording() ?? -1
     }
 
     @discardableResult
     func startRecording() -> Int {
-        RTC.audioDeviceModule.startRecording()
+        RTC.audioDeviceModule?.startRecording() ?? -1
     }
 
     @discardableResult
     func stopRecording() -> Int {
-        RTC.audioDeviceModule.stopRecording()
+        RTC.audioDeviceModule?.stopRecording() ?? -1
     }
 }

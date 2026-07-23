@@ -34,6 +34,8 @@ struct CustomAudioDeviceConfigurationTests {
         #expect(reselectedSameDevice)
         #expect(!selectedDifferentDevice)
         #expect(!selectedStandardDevice)
+        #expect(state.audioDeviceRuntimeKind == .custom)
+        #expect(!state.shouldStartRecordingBeforeSenderAttachment)
     }
 
     @Test("standard selection clears a pre-initialization custom device")
@@ -45,6 +47,37 @@ struct CustomAudioDeviceConfigurationTests {
         #expect(selectedStandardDevice)
         #expect(state.customAudioDevice == nil)
         #expect(state.admType == .platformDefault)
+        #expect(state.audioDeviceRuntimeKind == .platformDefault)
+        #expect(state.shouldStartRecordingBeforeSenderAttachment)
+    }
+
+    @Test("runtime capabilities distinguish standard and custom ownership")
+    func runtimeCapabilities() {
+        let audioEngine = AudioDeviceRuntimeKind.audioEngine.capabilities
+        #expect(audioEngine.hasStandardAudioDeviceModule)
+        #if os(macOS)
+        #expect(audioEngine.supportsSDKDeviceSelection)
+        #else
+        #expect(!audioEngine.supportsSDKDeviceSelection)
+        #endif
+        #expect(audioEngine.supportsPlatformVoiceProcessing)
+        #expect(audioEngine.supportsAudioProcessingDelegates)
+
+        let platformDefault = AudioDeviceRuntimeKind.platformDefault.capabilities
+        #expect(platformDefault.hasStandardAudioDeviceModule)
+        #if os(macOS)
+        #expect(platformDefault.supportsSDKDeviceSelection)
+        #else
+        #expect(!platformDefault.supportsSDKDeviceSelection)
+        #endif
+        #expect(!platformDefault.supportsPlatformVoiceProcessing)
+        #expect(platformDefault.supportsAudioProcessingDelegates)
+
+        let custom = AudioDeviceRuntimeKind.custom.capabilities
+        #expect(!custom.hasStandardAudioDeviceModule)
+        #expect(!custom.supportsSDKDeviceSelection)
+        #expect(!custom.supportsPlatformVoiceProcessing)
+        #expect(!custom.supportsAudioProcessingDelegates)
     }
 }
 

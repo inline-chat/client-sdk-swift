@@ -98,6 +98,7 @@ public final class SessionRequirementHandle: @unchecked Sendable {
 }
 
 // Audio Session Configuration related
+// swiftlint:disable:next type_body_length
 public class AudioManager: Loggable {
     // MARK: - Public
 
@@ -192,12 +193,18 @@ public class AudioManager: Loggable {
 
     private lazy var capturePostProcessingDelegateAdapter = AudioCustomProcessingDelegateAdapter(
         label: "capturePost",
-        rtcDelegateSetter: { RTC.audioProcessingModule.capturePostProcessingDelegate = $0 },
+        rtcDelegateSetter: {
+            guard RTC.audioDeviceRuntimeCapabilities.supportsAudioProcessingDelegates else { return }
+            RTC.audioProcessingModule.capturePostProcessingDelegate = $0
+        },
     )
 
     private lazy var renderPreProcessingDelegateAdapter = AudioCustomProcessingDelegateAdapter(
         label: "renderPre",
-        rtcDelegateSetter: { RTC.audioProcessingModule.renderPreProcessingDelegate = $0 },
+        rtcDelegateSetter: {
+            guard RTC.audioDeviceRuntimeCapabilities.supportsAudioProcessingDelegates else { return }
+            RTC.audioProcessingModule.renderPreProcessingDelegate = $0
+        },
     )
 
     let capturePostProcessingDelegateSubject = CurrentValueSubject<AudioCustomProcessingDelegate?, Never>(nil)
@@ -230,7 +237,7 @@ public class AudioManager: Loggable {
 
     public var outputDevices: [AudioDevice] {
         #if os(macOS)
-        RTC.audioDeviceModule.outputDevices.map { AudioDevice(ioDevice: $0) }
+        RTC.audioDeviceModule?.outputDevices.map { AudioDevice(ioDevice: $0) } ?? []
         #else
         []
         #endif
@@ -238,7 +245,7 @@ public class AudioManager: Loggable {
 
     public var inputDevices: [AudioDevice] {
         #if os(macOS)
-        RTC.audioDeviceModule.inputDevices.map { AudioDevice(ioDevice: $0) }
+        RTC.audioDeviceModule?.inputDevices.map { AudioDevice(ioDevice: $0) } ?? []
         #else
         []
         #endif
@@ -247,14 +254,19 @@ public class AudioManager: Loggable {
     public var outputDevice: AudioDevice {
         get {
             #if os(macOS)
-            AudioDevice(ioDevice: RTC.audioDeviceModule.outputDevice)
+            guard let audioDeviceModule = RTC.audioDeviceModule else { return defaultOutputDevice }
+            return AudioDevice(ioDevice: audioDeviceModule.outputDevice)
             #else
             AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .output))
             #endif
         }
         set {
             #if os(macOS)
-            RTC.audioDeviceModule.outputDevice = newValue._ioDevice
+            guard let audioDeviceModule = RTC.audioDeviceModule else {
+                logUnsupportedStandardAudioDeviceOperation("Output-device selection")
+                return
+            }
+            audioDeviceModule.outputDevice = newValue._ioDevice
             #endif
         }
     }
@@ -262,14 +274,19 @@ public class AudioManager: Loggable {
     public var inputDevice: AudioDevice {
         get {
             #if os(macOS)
-            AudioDevice(ioDevice: RTC.audioDeviceModule.inputDevice)
+            guard let audioDeviceModule = RTC.audioDeviceModule else { return defaultInputDevice }
+            return AudioDevice(ioDevice: audioDeviceModule.inputDevice)
             #else
             AudioDevice(ioDevice: LKRTCIODevice.defaultDevice(with: .input))
             #endif
         }
         set {
             #if os(macOS)
-            RTC.audioDeviceModule.inputDevice = newValue._ioDevice
+            guard let audioDeviceModule = RTC.audioDeviceModule else {
+                logUnsupportedStandardAudioDeviceOperation("Input-device selection")
+                return
+            }
+            audioDeviceModule.inputDevice = newValue._ioDevice
             #endif
         }
     }
@@ -300,8 +317,14 @@ public class AudioManager: Loggable {
     ///   the voice-chat stream itself.
     /// - SeeAlso: ``duckingLevel``
     public var isAdvancedDuckingEnabled: Bool {
-        get { RTC.audioDeviceModule.isAdvancedDuckingEnabled }
-        set { RTC.audioDeviceModule.isAdvancedDuckingEnabled = newValue }
+        get { RTC.audioDeviceModule?.isAdvancedDuckingEnabled ?? false }
+        set {
+            guard let audioDeviceModule = RTC.audioDeviceModule else {
+                logUnsupportedStandardAudioDeviceOperation("Advanced ducking")
+                return
+            }
+            audioDeviceModule.isAdvancedDuckingEnabled = newValue
+        }
     }
 
     /// Controls how much *other audio* is reduced ("ducked") while using Apple's voice processing APIs.
@@ -316,8 +339,14 @@ public class AudioManager: Loggable {
     /// ``AudioDuckingLevel/default`` matches Apple's historical fixed ducking amount (not the SDK default).
     @available(iOS 17, macOS 14.0, visionOS 1.0, *)
     public var duckingLevel: AudioDuckingLevel {
-        get { RTC.audioDeviceModule.duckingLevel.toLKType() }
-        set { RTC.audioDeviceModule.duckingLevel = newValue.toRTCType() }
+        get { RTC.audioDeviceModule?.duckingLevel.toLKType() ?? .default }
+        set {
+            guard let audioDeviceModule = RTC.audioDeviceModule else {
+                logUnsupportedStandardAudioDeviceOperation("Ducking-level selection")
+                return
+            }
+            audioDeviceModule.duckingLevel = newValue.toRTCType()
+        }
     }
 
     /// Whether Apple's platform voice processing is allowed.
@@ -329,10 +358,13 @@ public class AudioManager: Loggable {
     /// Use ``AudioProcessingOptions`` with `.software` modes for per-track or
     /// per-capture software voice processing. Use this policy when the app must
     /// guarantee Apple Voice Processing I/O is not used.
-    public var isPlatformVoiceProcessingAllowed: Bool { RTC.audioDeviceModule.isPlatformVoiceProcessingAllowed }
+    public var isPlatformVoiceProcessingAllowed: Bool {
+        RTC.audioDeviceModule?.isPlatformVoiceProcessingAllowed ?? false
+    }
 
     public func setPlatformVoiceProcessingAllowed(_ allowed: Bool) throws {
-        let result = RTC.audioDeviceModule.setPlatformVoiceProcessingAllowed(allowed)
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Platform voice-processing policy")
+        let result = audioDeviceModule.setPlatformVoiceProcessingAllowed(allowed)
         try checkAdmResult(code: result)
     }
 
@@ -351,32 +383,45 @@ public class AudioManager: Loggable {
     /// Defaults to `false`.
     public var isVoiceProcessingBypassed: Bool {
         get {
-            if RTC.pcFactoryState.admType == .platformDefault {
-                return RTC.pcFactoryState.bypassVoiceProcessing
+            switch RTC.audioDeviceRuntimeKind {
+            case .platformDefault:
+                RTC.pcFactoryState.read(\.bypassVoiceProcessing)
+            case .custom:
+                false
+            case .audioEngine:
+                RTC.audioDeviceModule?.isVoiceProcessingBypassed ?? false
             }
-
-            return RTC.audioDeviceModule.isVoiceProcessingBypassed
         }
         set {
-            guard !(RTC.pcFactoryState.read { $0.isInitialized && $0.admType == .platformDefault }) else {
+            guard RTC.audioDeviceRuntimeKind != .custom else {
+                logUnsupportedStandardAudioDeviceOperation("Voice-processing bypass")
+                return
+            }
+            guard !(RTC.pcFactoryState.read { $0.isInitialized && $0.audioDeviceRuntimeKind == .platformDefault }) else {
                 log("Cannot set this property after the peer connection has been initialized when using non-AVAudioEngine audio device module", .error)
                 return
             }
 
-            RTC.audioDeviceModule.isVoiceProcessingBypassed = newValue
+            RTC.audioDeviceModule?.isVoiceProcessingBypassed = newValue
         }
     }
 
     /// Bypass the Auto Gain Control of internal AVAudioEngine.
     /// It is valid to toggle this at runtime.
     public var isVoiceProcessingAGCEnabled: Bool {
-        get { RTC.audioDeviceModule.isVoiceProcessingAGCEnabled }
-        set { RTC.audioDeviceModule.isVoiceProcessingAGCEnabled = newValue }
+        get { RTC.audioDeviceModule?.isVoiceProcessingAGCEnabled ?? false }
+        set {
+            guard let audioDeviceModule = RTC.audioDeviceModule else {
+                logUnsupportedStandardAudioDeviceOperation("Platform automatic-gain control")
+                return
+            }
+            audioDeviceModule.isVoiceProcessingAGCEnabled = newValue
+        }
     }
 
     /// Device-level platform voice-processing capability and requested/active state.
     public var platformVoiceProcessingState: PlatformVoiceProcessingState {
-        RTC.audioDeviceModule.platformAudioProcessingState.toLKType()
+        RTC.audioDeviceModule?.platformAudioProcessingState.toLKType() ?? .unavailable
     }
 
     /// Diagnostic snapshot of the resolved audio processing state.
@@ -394,18 +439,21 @@ public class AudioManager: Loggable {
     /// Remote audio will not play out automatically. Get remote mixed audio buffers with `AudioManager.shared.add(localAudioRenderer:)` or individual tracks with ``RemoteAudioTrack/add(audioRenderer:)``.
     /// - Note: While enabled, the SDK will not configure `AVAudioSession`. Configure it yourself if your app does its own audio I/O.
     public func setManualRenderingMode(_ enabled: Bool) throws {
-        let result = RTC.audioDeviceModule.setManualRenderingMode(enabled)
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Manual rendering mode")
+        let result = audioDeviceModule.setManualRenderingMode(enabled)
         try checkAdmResult(code: result)
     }
 
-    public var isManualRenderingMode: Bool { RTC.audioDeviceModule.isManualRenderingMode }
+    public var isManualRenderingMode: Bool { RTC.audioDeviceModule?.isManualRenderingMode ?? false }
 
     // MARK: - Recording
 
     /// Whether recording is kept initialized (mic input) for low-latency publish.
     ///
     /// - SeeAlso: ``setRecordingAlwaysPreparedMode(_:)``
-    public var isRecordingAlwaysPreparedMode: Bool { RTC.audioDeviceModule.isRecordingAlwaysPreparedMode }
+    public var isRecordingAlwaysPreparedMode: Bool {
+        RTC.audioDeviceModule?.isRecordingAlwaysPreparedMode ?? false
+    }
 
     /// Prepares the microphone capture pipeline for low-latency publishing.
     ///
@@ -422,7 +470,8 @@ public class AudioManager: Loggable {
         _ enabled: Bool,
         audioProcessingOptions: AudioProcessingOptions? = nil,
     ) async throws {
-        let result = RTC.audioDeviceModule.setRecordingAlwaysPreparedMode(
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Always-prepared recording mode")
+        let result = audioDeviceModule.setRecordingAlwaysPreparedMode(
             enabled,
             audioProcessingOptions: audioProcessingOptions?.toRTCType(),
         )
@@ -432,10 +481,11 @@ public class AudioManager: Loggable {
     /// Starts mic input to the SDK even without any ``Room`` or a connection.
     /// Audio buffers will flow into ``LocalAudioTrack/add(audioRenderer:)`` and ``capturePostProcessingDelegate``.
     public func startLocalRecording(audioProcessingOptions: AudioProcessingOptions? = nil) throws {
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Explicit local recording")
         // Always unmute APM if muted by last session.
         RTC.audioProcessingModule.isMuted = false // TODO: Possibly not required anymore with new libs
         // Start recording on the ADM.
-        let result = RTC.audioDeviceModule.initAndStartRecording(
+        let result = audioDeviceModule.initAndStartRecording(
             audioProcessingOptions: audioProcessingOptions?.toRTCType(),
         )
         try checkAdmResult(code: result)
@@ -443,7 +493,8 @@ public class AudioManager: Loggable {
 
     /// Stops mic input after it was started with ``startLocalRecording()``
     public func stopLocalRecording() throws {
-        let result = RTC.audioDeviceModule.stopRecording()
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Explicit local recording")
+        let result = audioDeviceModule.stopRecording()
         try checkAdmResult(code: result)
     }
 
@@ -463,12 +514,13 @@ public class AudioManager: Loggable {
     /// device yet (e.g., CallKit flows), or to guarantee the engine remains off
     /// regardless of subscription/publication requests.
     public func setEngineAvailability(_ availability: AudioEngineAvailability) throws {
-        let result = RTC.audioDeviceModule.setEngineAvailability(availability.toRTCType())
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Audio-engine availability")
+        let result = audioDeviceModule.setEngineAvailability(availability.toRTCType())
         try checkAdmResult(code: result)
     }
 
     public var engineAvailability: AudioEngineAvailability {
-        RTC.audioDeviceModule.engineAvailability.toLKType()
+        RTC.audioDeviceModule?.engineAvailability.toLKType() ?? .none
     }
 
     /// Set a chain of ``AudioEngineObserver``s.
@@ -483,7 +535,7 @@ public class AudioManager: Loggable {
     }
 
     public var isEngineRunning: Bool {
-        RTC.audioDeviceModule.isEngineRunning
+        RTC.audioDeviceModule?.isEngineRunning ?? false
     }
 
     /// Acquires an audio session requirement for external ownership.
@@ -500,9 +552,13 @@ public class AudioManager: Loggable {
     /// The mute state of internal audio engine which uses Voice Processing I/O mute API ``AVAudioInputNode.isVoiceProcessingInputMuted``.
     /// Normally, you do not need to set this manually since it will be handled automatically.
     public var isMicrophoneMuted: Bool {
-        get { RTC.audioDeviceModule.isMicrophoneMuted }
+        get { RTC.audioDeviceModule?.isMicrophoneMuted ?? false }
         set {
-            let result = RTC.audioDeviceModule.setMicrophoneMuted(newValue)
+            guard let audioDeviceModule = RTC.audioDeviceModule else {
+                logUnsupportedStandardAudioDeviceOperation("Platform microphone muting")
+                return
+            }
+            let result = audioDeviceModule.setMicrophoneMuted(newValue)
             if result != 0 {
                 log("Failed to set microphone muted: \(result)", .error)
             }
@@ -534,7 +590,7 @@ public class AudioManager: Loggable {
         #endif
         _state = StateSync(State(engineObservers: engineObservers))
         _admDelegateAdapter.audioManager = self
-        RTC.audioDeviceModule.observer = _admDelegateAdapter
+        RTC.audioDeviceModule?.observer = _admDelegateAdapter
     }
 }
 
@@ -587,6 +643,10 @@ let kAudioEngineErrorInsufficientDevicePermission = -9000
 let kAudioEngineErrorAudioSessionInvalidCategory = -9001
 
 extension AudioManager {
+    func logUnsupportedStandardAudioDeviceOperation(_ operation: String) {
+        log("\(operation) is unavailable with a custom audio device", .warning)
+    }
+
     func checkAdmResult(code: Int) throws {
         if code == kAudioEngineErrorFailedToConfigureAudioSession {
             throw LiveKitError(.audioSession, message: "Failed to configure audio session")

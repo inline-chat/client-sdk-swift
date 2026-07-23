@@ -166,6 +166,38 @@ public struct PlatformVoiceProcessingFlagState: Sendable {
 
 /// Device-level snapshot of Apple's platform Voice Processing I/O.
 public struct PlatformVoiceProcessingState: Sendable {
+    /// A snapshot for runtimes that do not expose Apple platform voice processing.
+    public static let unavailable = PlatformVoiceProcessingState(
+        topology: .independent,
+        echoCancellation: PlatformVoiceProcessingComponentState(
+            isAvailable: false,
+            isRequested: false,
+            isActive: false,
+        ),
+        noiseSuppression: PlatformVoiceProcessingComponentState(
+            isAvailable: false,
+            isRequested: false,
+            isActive: false,
+        ),
+        autoGainControl: PlatformVoiceProcessingComponentState(
+            isAvailable: false,
+            isRequested: false,
+            isActive: false,
+        ),
+        voiceProcessingEnabled: PlatformVoiceProcessingFlagState(
+            isRequested: false,
+            isActive: false,
+        ),
+        voiceProcessingBypassed: PlatformVoiceProcessingFlagState(
+            isRequested: false,
+            isActive: false,
+        ),
+        voiceProcessingAGCEnabled: PlatformVoiceProcessingFlagState(
+            isRequested: false,
+            isActive: false,
+        ),
+    )
+
     public let topology: PlatformVoiceProcessingTopology
     public let echoCancellation: PlatformVoiceProcessingComponentState
     public let noiseSuppression: PlatformVoiceProcessingComponentState

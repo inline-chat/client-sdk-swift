@@ -31,6 +31,14 @@ actor RTC {
         var bypassVoiceProcessing: Bool = false
         var customAudioDevice: (any CustomAudioDevice)?
 
+        var audioDeviceRuntimeKind: AudioDeviceRuntimeKind {
+            customAudioDevice == nil ? admType.runtimeKind : .custom
+        }
+
+        var shouldStartRecordingBeforeSenderAttachment: Bool {
+            audioDeviceRuntimeKind != .custom
+        }
+
         mutating func selectAudioDeviceModuleType(_ type: AudioDeviceModuleType) -> Bool {
             if isInitialized {
                 return customAudioDevice == nil && admType == type
@@ -95,8 +103,32 @@ actor RTC {
 
     // forbid direct access
 
-    static var audioDeviceModule: LKRTCAudioDeviceModule {
-        peerConnectionFactory.audioDeviceModule
+    static var audioDeviceRuntimeKind: AudioDeviceRuntimeKind {
+        pcFactoryState.read(\.audioDeviceRuntimeKind)
+    }
+
+    static var audioDeviceRuntimeCapabilities: AudioDeviceRuntimeCapabilities {
+        audioDeviceRuntimeKind.capabilities
+    }
+
+    static var shouldStartRecordingBeforeSenderAttachment: Bool {
+        pcFactoryState.read(\.shouldStartRecordingBeforeSenderAttachment)
+    }
+
+    static var audioDeviceModule: LKRTCAudioDeviceModule? {
+        let factory = peerConnectionFactory
+        guard pcFactoryState.read(\.audioDeviceRuntimeKind) != .custom else { return nil }
+        return factory.audioDeviceModule
+    }
+
+    static func requireAudioDeviceModule(for operation: String) throws -> LKRTCAudioDeviceModule {
+        guard let audioDeviceModule else {
+            throw LiveKitError(
+                .invalidState,
+                message: "\(operation) is unavailable with a custom audio device; the application owns physical audio I/O",
+            )
+        }
+        return audioDeviceModule
     }
 
     static func createPeerConnection(_ configuration: LKRTCConfiguration,

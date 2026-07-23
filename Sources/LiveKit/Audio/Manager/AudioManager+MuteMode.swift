@@ -37,14 +37,15 @@ public enum MicrophoneMuteMode {
 
 public extension AudioManager {
     var microphoneMuteMode: MicrophoneMuteMode {
-        RTC.audioDeviceModule.muteMode.toLKType()
+        RTC.audioDeviceModule?.muteMode.toLKType() ?? .unknown
     }
 
     func set(microphoneMuteMode mode: MicrophoneMuteMode) throws {
         guard mode != .unknown else {
             throw LiveKitError(.invalidState, message: "Unsupported mute mode specified")
         }
-        let result = RTC.audioDeviceModule.setMuteMode(mode.toRTCType())
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Microphone mute mode")
+        let result = audioDeviceModule.setMuteMode(mode.toRTCType())
         try checkAdmResult(code: result)
     }
 }
@@ -59,12 +60,13 @@ public extension AudioManager {
     /// - Legacy: Restarts the internal `AVAudioEngine` without mic input when muted.
     ///   This is slower, and muted speaker detection does not work. No sound effect is played.
     @available(*, deprecated, message: "Use `muteMode` instead")
-    var isLegacyMuteMode: Bool { RTC.audioDeviceModule.muteMode == .restartEngine }
+    var isLegacyMuteMode: Bool { RTC.audioDeviceModule?.muteMode == .restartEngine }
 
     @available(*, deprecated, message: "Use `set(muteMode:)` instead")
     func setLegacyMuteMode(_ enabled: Bool) throws {
         let mode: LKRTCAudioEngineMuteMode = enabled ? .restartEngine : .voiceProcessing
-        let result = RTC.audioDeviceModule.setMuteMode(mode)
+        let audioDeviceModule = try RTC.requireAudioDeviceModule(for: "Microphone mute mode")
+        let result = audioDeviceModule.setMuteMode(mode)
         try checkAdmResult(code: result)
     }
 }

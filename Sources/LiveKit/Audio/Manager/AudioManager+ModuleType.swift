@@ -16,11 +16,41 @@
 
 internal import LiveKitWebRTC
 
-public enum AudioDeviceModuleType: Equatable {
+public enum AudioDeviceModuleType: Equatable, Sendable {
     /// Use AVAudioEngine-based AudioDeviceModule internally which will be used for all platforms.
     case audioEngine
     /// Use WebRTC's default AudioDeviceModule internally, which uses AudioUnit for iOS, HAL APIs for macOS.
     case platformDefault
+}
+
+/// The process-wide audio-device runtime selected for LiveKit's peer-connection factory.
+public enum AudioDeviceRuntimeKind: Equatable, Sendable {
+    /// LiveKit's `AVAudioEngine`-backed standard audio device module.
+    case audioEngine
+    /// WebRTC's platform-default standard audio device module.
+    case platformDefault
+    /// An application-provided ``CustomAudioDevice``.
+    case custom
+}
+
+/// Capabilities exposed by the selected process-wide audio-device runtime.
+///
+/// Use this snapshot before calling APIs that operate on LiveKit's standard
+/// audio-device wrapper. A custom device owns its physical I/O and device
+/// selection, while WebRTC sender and receiver demand owns its start/stop
+/// lifecycle.
+public struct AudioDeviceRuntimeCapabilities: Equatable, Sendable {
+    /// Whether APIs backed by LiveKit's standard audio-device wrapper are available.
+    public let hasStandardAudioDeviceModule: Bool
+
+    /// Whether LiveKit can enumerate and select physical input and output devices.
+    public let supportsSDKDeviceSelection: Bool
+
+    /// Whether Apple's platform voice-processing controls are available.
+    public let supportsPlatformVoiceProcessing: Bool
+
+    /// Whether LiveKit's capture-post and render-pre processing delegates are connected.
+    public let supportsAudioProcessingDelegates: Bool
 }
 
 extension AudioDeviceModuleType {
@@ -30,9 +60,60 @@ extension AudioDeviceModuleType {
         case .platformDefault: LKRTCAudioDeviceModuleType.platformDefault
         }
     }
+
+    var runtimeKind: AudioDeviceRuntimeKind {
+        switch self {
+        case .audioEngine: .audioEngine
+        case .platformDefault: .platformDefault
+        }
+    }
+}
+
+extension AudioDeviceRuntimeKind {
+    var capabilities: AudioDeviceRuntimeCapabilities {
+        #if os(macOS)
+        let supportsSDKDeviceSelection = self != .custom
+        #else
+        let supportsSDKDeviceSelection = false
+        #endif
+
+        switch self {
+        case .audioEngine:
+            return AudioDeviceRuntimeCapabilities(
+                hasStandardAudioDeviceModule: true,
+                supportsSDKDeviceSelection: supportsSDKDeviceSelection,
+                supportsPlatformVoiceProcessing: true,
+                supportsAudioProcessingDelegates: true,
+            )
+        case .platformDefault:
+            return AudioDeviceRuntimeCapabilities(
+                hasStandardAudioDeviceModule: true,
+                supportsSDKDeviceSelection: supportsSDKDeviceSelection,
+                supportsPlatformVoiceProcessing: false,
+                supportsAudioProcessingDelegates: true,
+            )
+        case .custom:
+            return AudioDeviceRuntimeCapabilities(
+                hasStandardAudioDeviceModule: false,
+                supportsSDKDeviceSelection: false,
+                supportsPlatformVoiceProcessing: false,
+                supportsAudioProcessingDelegates: false,
+            )
+        }
+    }
 }
 
 public extension AudioManager {
+    /// The audio-device runtime that will be used, or is already in use, process-wide.
+    static var audioDeviceRuntimeKind: AudioDeviceRuntimeKind {
+        RTC.audioDeviceRuntimeKind
+    }
+
+    /// Capabilities of the selected process-wide audio-device runtime.
+    static var audioDeviceRuntimeCapabilities: AudioDeviceRuntimeCapabilities {
+        RTC.audioDeviceRuntimeCapabilities
+    }
+
     /// Sets the desired `AudioDeviceModuleType` to be used which handles all audio input / output.
     ///
     /// This method must be called before the peer connection is initialized. Changing the module type after

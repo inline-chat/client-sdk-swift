@@ -118,6 +118,9 @@ public class LocalAudioTrack: Track, LocalTrackProtocol, AudioTrackProtocol, @un
     override func startCapture() async throws {
         // AudioDeviceModule's InitRecording() and StartRecording() automatically get called by WebRTC, but
         // explicitly init & start it early to detect audio engine failures (mic not accessible for some reason, etc.).
+        // A custom device has no standard AudioDeviceModule wrapper. Its recording lifecycle is driven by
+        // WebRTC sender demand, which calls CustomAudioDevice.initializeRecording() and startRecording().
+        guard RTC.shouldStartRecordingBeforeSenderAttachment else { return }
         try AudioManager.shared.startLocalRecording(
             audioProcessingOptions: captureOptions.audioProcessing,
         )
