@@ -36,7 +36,11 @@ public struct AudioEngineRuntimeDiagnostics: Equatable, Sendable {
     /// Sample rate committed to the current WebRTC recording graph generation.
     /// Zero means no recording graph is configured.
     public let configuredRecordingSampleRate: Double
+    /// Channel count committed to the current WebRTC playout graph generation.
+    /// Zero means no playout graph is configured.
     public let configuredPlayoutChannels: UInt32
+    /// Channel count committed to the current WebRTC recording graph generation.
+    /// Zero means no recording graph is configured.
     public let configuredRecordingChannels: UInt32
 
     init(native: LKRTCAudioEngineRuntimeDiagnostics) {
