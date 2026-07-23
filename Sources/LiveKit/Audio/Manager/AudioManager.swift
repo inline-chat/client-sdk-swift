@@ -275,52 +275,6 @@ public class AudioManager: Loggable {
         }
     }
 
-    /// Safe current output-device readback for route verification.
-    ///
-    /// WebRTC's Objective-C getter can transiently return `nil` during device
-    /// churn even though its imported Swift signature is nonoptional. KVC
-    /// preserves the underlying nullability and avoids constructing an
-    /// `AudioDevice` around a missing native object.
-    public var currentOutputDevice: AudioDevice? {
-        #if os(macOS)
-        let module = RTC.audioDeviceModule as NSObject
-        guard let device = module.value(forKey: "outputDevice") as? LKRTCIODevice
-        else { return nil }
-        return AudioDevice(ioDevice: device)
-        #else
-        return nil
-        #endif
-    }
-
-    /// Safe current input-device readback for route verification. See
-    /// ``currentOutputDevice`` for the Objective-C nullability rationale.
-    public var currentInputDevice: AudioDevice? {
-        #if os(macOS)
-        let module = RTC.audioDeviceModule as NSObject
-        guard let device = module.value(forKey: "inputDevice") as? LKRTCIODevice
-        else { return nil }
-        return AudioDevice(ioDevice: device)
-        #else
-        return nil
-        #endif
-    }
-
-    /// Whether the standard audio device module is actively rendering audio.
-    ///
-    /// Unlike ``isEngineRunning``, this is meaningful for both the custom
-    /// AudioEngine device and WebRTC's platform-default audio device.
-    public var isPlaying: Bool {
-        RTC.audioDeviceModule.playing
-    }
-
-    /// Whether the standard audio device module is actively capturing audio.
-    ///
-    /// Unlike ``isEngineRunning``, this is meaningful for both the custom
-    /// AudioEngine device and WebRTC's platform-default audio device.
-    public var isRecording: Bool {
-        RTC.audioDeviceModule.recording
-    }
-
     /// Detect voice activity even if the mic is muted.
     /// Internal audio engine must be initialized by calling ``prepareRecording()`` or
     /// connecting to a room and subscribing to a remote audio track or publishing a local audio track.
